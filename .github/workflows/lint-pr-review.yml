@@ -35,6 +35,8 @@ jobs:
 
       - name: Lint
         run: |
+          # The backticks in the printf formats are literal markdown fences.
+          # shellcheck disable=SC2016
           set -uo pipefail
           status=0
           # Test the tools' own output, not the assembled markdown.
