@@ -35,22 +35,22 @@ jobs:
 
       - name: Lint
         run: |
-          # The backticks in the printf formats are literal markdown fences.
-          # shellcheck disable=SC2016
           set -uo pipefail
           status=0
           # Test the tools' own output, not the assembled markdown.
           AL=$("$RUNNER_TEMP/actionlint" -no-color 2>&1) || status=1
           SC=$(find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck 2>&1) || status=1
           TESTS=$(bash .github/scripts/label-issue.test.sh 2>&1) || status=1
+          fence=$(printf '\140\140\140')  # a markdown code fence
+          section() { printf '\n### %s\n%s\n%s\n%s\n' "$1" "$fence" "$2" "$fence"; }
           {
             if [ "$status" -eq 0 ]; then
               echo "actionlint, shellcheck and the labeler tests found no issues."
             else
               echo "## Lint results"
-              if [ -n "$AL" ]; then printf '\n### actionlint\n```\n%s\n```\n' "$AL"; fi
-              if [ -n "$SC" ]; then printf '\n### shellcheck\n```\n%s\n```\n' "$SC"; fi
-              if ! grep -q '^all passed$' <<< "$TESTS"; then printf '\n### labeler tests\n```\n%s\n```\n' "$TESTS"; fi
+              if [ -n "$AL" ]; then section actionlint "$AL"; fi
+              if [ -n "$SC" ]; then section shellcheck "$SC"; fi
+              if ! grep -q '^all passed$' <<< "$TESTS"; then section "labeler tests" "$TESTS"; fi
             fi
           } > review.md
 
