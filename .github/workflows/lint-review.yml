@@ -19,7 +19,7 @@ name: Lint review (reusable)
 #     pull-requests: write
 #   jobs:
 #     lint:
-#       uses: willardcsoriano/.github/.github/workflows/lint-review.yml@v1
+#       uses: willardcsoriano/.github/.github/workflows/lint-review.yml@v1.1.0
 #       with:
 #         ruff-version: "0.16.10"   # optional
 #

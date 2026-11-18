@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is the shared home for how my repos run on GitHub. GitHub treats a public repo named `.github` specially: the issue forms and PR template here become the defaults for every repo on this account that has none of its own. The workflows here are reusable: another repo calls them in one line instead of keeping its own copy, so a fix made here reaches every repo. Today it holds the release, lint-review and issue-labeling workflows, plus the issue forms and PR template every repo inherits. Repos pin it to a major tag (`@v1`), so a change here reaches them only when the tag moves. Conventions themselves (issue → commits → PR → review, Conventional Commits, merge commits) are described in my global agent instructions; this repo holds what GitHub runs.
+This is the shared home for how my repos run on GitHub. GitHub treats a public repo named `.github` specially: the issue forms and PR template here become the defaults for every repo on this account that has none of its own. The workflows here are reusable: another repo calls them in one line instead of keeping its own copy, so a fix made here reaches every repo. Today it holds the release, lint-review and issue-labeling workflows, plus the issue forms and PR template every repo inherits. Repos pin an exact release tag (`@v1.1.0`), so a change here reaches a repo only when that repo moves its pin. Conventions themselves (issue → commits → PR → review, Conventional Commits, merge commits) are described in my global agent instructions; this repo holds what GitHub runs.
 
 ## Table of Contents
 
@@ -64,7 +64,7 @@ It labels each issue from its Conventional Commits title:
 - the scope → `area:<scope>`;
 - a title that doesn't parse → `needs-triage`.
 
-The script and its table tests live only here, in `.github/scripts/`. The workflow fetches them at `scripts-ref`, which defaults to the `v1` tag, so callers keep no copy. The caller is in the file's header comment.
+The script and its table tests live only here, in `.github/scripts/`. The workflow fetches them at `scripts-ref`, which defaults to the release tag the workflow itself ships in, so callers keep no copy. The caller is in the file's header comment.
 
 ## Defaults for every repo
 
@@ -79,4 +79,13 @@ This repo uses its own shared workflows, run from the same commit (`uses: ./…`
 
 ## Versioning
 
-Callers pin a major tag, such as `@v1`. A compatible change moves `v1` forward. A change that would break a caller gets `v2`, and callers move when they choose to.
+Releases are immutable tags: `v1.1.0`, `v1.2.0` and so on. Callers pin one exactly (`uses: …/lint-review.yml@v1.1.0`) and move by editing the pin, which is a one-line, reviewable change in each repo. A tag never moves. `v1` is the first release and stays where it is; `v1.1.0` is the first under this rule.
+
+To release:
+
+1. Merge the change.
+2. Set `label-issues.yml`'s `scripts-ref` default to the new tag, through a PR.
+3. Tag the merge commit, for example: `git tag -a v1.2.0 -m v1.2.0 && git push origin v1.2.0`.
+4. Bump the pins in the repos that should get it.
+
+Use a minor bump for a compatible change and a major bump when callers must change too.
