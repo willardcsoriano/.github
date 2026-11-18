@@ -1,10 +1,8 @@
 name: Lint PR review
 
-# This repo's linter reviewer: actionlint over the workflow files (it also
-# runs shellcheck on their run: scripts), shellcheck over the shell scripts,
-# and the labeler's table tests. Posts the result as a COMMENT review from
-# github-actions[bot]; GitHub refuses APPROVE reviews from the Actions token.
-# Deterministic, no LLM, no secrets.
+# This repo's linter reviewer: the shared lint-review.yml it publishes, run
+# from this very commit with actionlint on, plus the labeler's table tests.
+# Checks: "lint / review" and "labeler-tests".
 
 on:
   pull_request:
@@ -14,48 +12,16 @@ permissions:
   contents: read
   pull-requests: write
 
-env:
-  ACTIONLINT_VERSION: 1.7.12
-
 jobs:
-  review:
+  lint:
+    uses: ./.github/workflows/lint-review.yml
+    with:
+      actionlint-version: "1.7.12"
+
+  labeler-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install actionlint (checksum verified)
-        run: |
-          set -euo pipefail
-          base="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
-          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl -sSfL -o "$RUNNER_TEMP/$tarball" "$base/$tarball"
-          curl -sSfL -o "$RUNNER_TEMP/sums.txt" "$base/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
-          (cd "$RUNNER_TEMP" && grep " $tarball\$" sums.txt | sha256sum -c -)
-          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" actionlint
-
-      - name: Lint
-        run: |
-          set -uo pipefail
-          status=0
-          # Test the tools' own output, not the assembled markdown.
-          AL=$("$RUNNER_TEMP/actionlint" -no-color 2>&1) || status=1
-          SC=$(find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck 2>&1) || status=1
-          TESTS=$(bash .github/scripts/label-issue.test.sh 2>&1) || status=1
-          fence=$(printf '\140\140\140')  # a markdown code fence
-          section() { printf '\n### %s\n%s\n%s\n%s\n' "$1" "$fence" "$2" "$fence"; }
-          {
-            if [ "$status" -eq 0 ]; then
-              echo "actionlint, shellcheck and the labeler tests found no issues."
-            else
-              echo "## Lint results"
-              if [ -n "$AL" ]; then section actionlint "$AL"; fi
-              if [ -n "$SC" ]; then section shellcheck "$SC"; fi
-              if ! grep -q '^all passed$' <<< "$TESTS"; then section "labeler tests" "$TESTS"; fi
-            fi
-          } > review.md
-
-      - name: Post as a GitHub review
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh pr review "$PR_NUMBER" --comment --body-file review.md
+      - run: bash .github/scripts/label-issue.test.sh
