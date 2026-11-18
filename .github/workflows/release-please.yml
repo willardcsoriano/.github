@@ -18,7 +18,7 @@ name: Release (reusable)
 #     issues: write
 #   jobs:
 #     release:
-#       uses: willardcsoriano/.github/.github/workflows/release-please.yml@v1
+#       uses: willardcsoriano/.github/.github/workflows/release-please.yml@v1.1.0
 #
 # It needs "Allow GitHub Actions to create and approve pull requests" on the
 # calling repo, because release-please opens the PR with GitHub's own token.

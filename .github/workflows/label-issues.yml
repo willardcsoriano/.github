@@ -4,7 +4,8 @@ name: Label issues (reusable)
 # feat -> enhancement, docs -> documentation, scope -> area:<scope>, and
 # needs-triage when the title doesn't parse. The logic and its table tests
 # are .github/scripts/label-issue{,.test}.sh in this repo, fetched at the
-# ref the caller names (default: the v1 tag), so callers keep no copy.
+# ref the caller names (default: this file's own release tag), so callers
+# keep no copy.
 # Deterministic: no LLM, no secrets.
 #
 # Caller:
@@ -17,7 +18,7 @@ name: Label issues (reusable)
 #     issues: write
 #   jobs:
 #     label:
-#       uses: willardcsoriano/.github/.github/workflows/label-issues.yml@v1
+#       uses: willardcsoriano/.github/.github/workflows/label-issues.yml@v1.1.0
 
 on:
   workflow_call:
@@ -25,7 +26,8 @@ on:
       scripts-ref:
         description: Ref of willardcsoriano/.github to take the labeler script from
         type: string
-        default: v1
+        # Set to the tag this file is released under (see README, Versioning).
+        default: v1.1.0
 
 jobs:
   label:
