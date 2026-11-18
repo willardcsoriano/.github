@@ -13,6 +13,7 @@ This is the shared home for how my repos run on GitHub. GitHub treats a public r
   - [Label issues (`label-issues.yml`)](#label-issues-label-issuesyml)
 - [Defaults for every repo](#defaults-for-every-repo)
 - [This repo's own checks](#this-repos-own-checks)
+- [Auditing every repo](#auditing-every-repo)
 - [Versioning](#versioning)
 
 ## Reusable workflows
@@ -76,6 +77,17 @@ This repo uses its own shared workflows, run from the same commit (`uses: ./…`
 
 - **`lint-pr-review.yml`:** `lint-review.yml` with actionlint on, plus a `labeler-tests` job that runs `label-issue.test.sh`.
 - **`issue-labeler.yml`:** `label-issues.yml`, with the script taken from the triggering commit.
+
+## Auditing every repo
+
+`bash scripts/audit-repos.sh` checks every active repo on the account against these conventions, private ones included, and prints one row per repo. It only reads, through your `gh` login, and exits non-zero when something needs fixing. Pass repo names to check only those. For each repo it checks:
+
+- **lint:** it calls the shared lint review;
+- **labeler:** it calls the shared labeler;
+- **pin:** its pins name the newest release tag;
+- **copies:** it keeps no local copy of what this repo shares;
+- **merge:** merge commits are allowed;
+- **public repos only:** a default-branch ruleset (PR-only, no force-push, no deletion, required checks), and secret scanning with push protection.
 
 ## Versioning
 
