@@ -1,0 +1,57 @@
+name: Label issues (reusable)
+
+# Labels each issue from its Conventional Commits title: fix -> bug,
+# feat -> enhancement, docs -> documentation, scope -> area:<scope>, and
+# needs-triage when the title doesn't parse. The logic and its table tests
+# are .github/scripts/label-issue{,.test}.sh in this repo, fetched at the
+# ref the caller names (default: the v1 tag), so callers keep no copy.
+# Deterministic: no LLM, no secrets.
+#
+# Caller:
+#
+#   on:
+#     issues:
+#       types: [opened, edited, reopened]
+#   permissions:
+#     contents: read
+#     issues: write
+#   jobs:
+#     label:
+#       uses: willardcsoriano/.github/.github/workflows/label-issues.yml@v1
+
+on:
+  workflow_call:
+    inputs:
+      scripts-ref:
+        description: Ref of willardcsoriano/.github to take the labeler script from
+        type: string
+        default: v1
+
+jobs:
+  label:
+    # Edits to the body alone don't change the classification.
+    if: >-
+      github.event_name == 'issues' &&
+      (github.event.action != 'edited' || github.event.changes.title.from != null)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: willardcsoriano/.github
+          ref: ${{ inputs.scripts-ref }}
+          sparse-checkout: .github/scripts
+          path: shared
+      - name: Label from title
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          # Passed through env, never interpolated into the script: an issue
+          # title is attacker-controlled text.
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_OLD_TITLE: ${{ github.event.changes.title.from }}
+          ISSUE_ACTION: ${{ github.event.action }}
+        run: bash shared/.github/scripts/label-issue.sh

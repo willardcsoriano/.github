@@ -2,13 +2,15 @@
 
 ## Overview
 
-This is the shared home for how my repos run on GitHub. GitHub treats a public repo named `.github` specially: the issue forms and PR template here become the defaults for every repo on this account that has none of its own. The workflows here are reusable: another repo calls them in one line instead of keeping its own copy, so a fix made here reaches every repo. Today it holds the release workflow, built on release-please, and the canonical issue labeler, issue forms and PR template. Repos pin it to a major tag (`@v1`), so a change here reaches them only when the tag moves. Conventions themselves (issue → commits → PR → review, Conventional Commits, merge commits) are described in my global agent instructions; this repo holds what GitHub runs.
+This is the shared home for how my repos run on GitHub. GitHub treats a public repo named `.github` specially: the issue forms and PR template here become the defaults for every repo on this account that has none of its own. The workflows here are reusable: another repo calls them in one line instead of keeping its own copy, so a fix made here reaches every repo. Today it holds the release, lint-review and issue-labeling workflows, plus the issue forms and PR template every repo inherits. Repos pin it to a major tag (`@v1`), so a change here reaches them only when the tag moves. Conventions themselves (issue → commits → PR → review, Conventional Commits, merge commits) are described in my global agent instructions; this repo holds what GitHub runs.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Reusable workflows](#reusable-workflows)
   - [Release (`release-please.yml`)](#release-release-pleaseyml)
+  - [Lint review (`lint-review.yml`)](#lint-review-lint-reviewyml)
+  - [Label issues (`label-issues.yml`)](#label-issues-label-issuesyml)
 - [Defaults for every repo](#defaults-for-every-repo)
 - [This repo's own checks](#this-repos-own-checks)
 - [Versioning](#versioning)
@@ -41,14 +43,39 @@ gh pr close N && gh pr reopen N && gh pr merge N --auto --merge --delete-branch
 
 The alternative is a personal access token stored as a secret, which is a long-lived credential this setup avoids on purpose.
 
+### Lint review (`lint-review.yml`)
+
+It lints what a PR changes and posts the result as a COMMENT review from github-actions[bot]. Findings are a record: the job succeeds either way, so a ruleset that requires the check requires only that it ran.
+
+What it runs:
+
+- **Always:** shellcheck on changed shell files. The `shell-paths` input takes one pathspec per line; the default is `*.sh` and `*.bash`. claude-config adds `.githooks/*`.
+- **With `ruff-version` set:** ruff, at that version, on changed Python.
+- **With `actionlint-version` set:** actionlint on all workflows, after a checksum-verified download. Its own shellcheck pass covers their `run:` steps.
+
+The check reports as **`lint / review`** when the caller's job is named `lint`. That is the name a ruleset must require. The caller is in the file's header comment.
+
+### Label issues (`label-issues.yml`)
+
+It labels each issue from its Conventional Commits title:
+
+- `fix` → `bug`;
+- `feat` → `enhancement`;
+- the scope → `area:<scope>`;
+- a title that doesn't parse → `needs-triage`.
+
+The script and its table tests live only here, in `.github/scripts/`. The workflow fetches them at `scripts-ref`, which defaults to the `v1` tag, so callers keep no copy. The caller is in the file's header comment.
+
 ## Defaults for every repo
 
 `.github/ISSUE_TEMPLATE/` (bug, feature and incident forms) and `.github/pull_request_template.md` apply to any repo on this account that has none of its own.
 
 ## This repo's own checks
 
-- **`lint-pr-review.yml`:** runs actionlint on the workflows (including shellcheck on their scripts), shellcheck on the scripts, and the labeler's table tests. It posts the result as a comment review on each PR.
-- **`issue-labeler.yml`:** labels issues from their Conventional Commits titles: `fix` → bug, `feat` → enhancement, and the scope → `area:<scope>`. The logic is in `.github/scripts/label-issue.sh`, and its tests are in `label-issue.test.sh`.
+This repo uses its own shared workflows, run from the same commit (`uses: ./…`), so a change is exercised on its own PR before any tag moves:
+
+- **`lint-pr-review.yml`:** `lint-review.yml` with actionlint on, plus a `labeler-tests` job that runs `label-issue.test.sh`.
+- **`issue-labeler.yml`:** `label-issues.yml`, with the script taken from the triggering commit.
 
 ## Versioning
 

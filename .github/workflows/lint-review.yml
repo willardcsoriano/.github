@@ -1,0 +1,115 @@
+name: Lint review (reusable)
+
+# Lints what a PR changes and posts the result as a COMMENT review from
+# github-actions[bot]. GitHub refuses APPROVE reviews from the Actions token,
+# and this never asks for one. Findings are a record: the job succeeds
+# either way, so a ruleset that requires it requires that it ran.
+#
+# Always: shellcheck on changed shell files (shellcheck ships on
+# ubuntu-latest). Optional, by input: ruff on changed Python, and actionlint
+# on the repo's workflows (its own shellcheck pass covers their run: steps).
+#
+# Caller:
+#
+#   on:
+#     pull_request:
+#       types: [opened, synchronize, reopened]
+#   permissions:
+#     contents: read
+#     pull-requests: write
+#   jobs:
+#     lint:
+#       uses: willardcsoriano/.github/.github/workflows/lint-review.yml@v1
+#       with:
+#         ruff-version: "0.16.10"   # optional
+#
+# The check is reported as "lint / review" (caller job / this job).
+
+on:
+  workflow_call:
+    inputs:
+      shell-paths:
+        description: Pathspecs of shell files, one per line
+        type: string
+        default: |
+          *.sh
+          *.bash
+      ruff-version:
+        description: Lint changed Python with this ruff version (empty skips it)
+        type: string
+        default: ""
+      actionlint-version:
+        description: Lint .github/workflows with this actionlint version (empty skips it)
+        type: string
+        default: ""
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install actionlint (checksum verified)
+        if: inputs.actionlint-version != ''
+        env:
+          VERSION: ${{ inputs.actionlint-version }}
+        run: |
+          set -euo pipefail
+          base="https://github.com/rhysd/actionlint/releases/download/v${VERSION}"
+          tarball="actionlint_${VERSION}_linux_amd64.tar.gz"
+          curl -sSfL -o "$RUNNER_TEMP/$tarball" "$base/$tarball"
+          curl -sSfL -o "$RUNNER_TEMP/sums.txt" "$base/actionlint_${VERSION}_checksums.txt"
+          (cd "$RUNNER_TEMP" && grep " $tarball\$" sums.txt | sha256sum -c -)
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" actionlint
+
+      - name: Lint
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          SHELL_PATHS: ${{ inputs.shell-paths }}
+          RUFF_VERSION: ${{ inputs.ruff-version }}
+          ACTIONLINT: ${{ inputs.actionlint-version != '' }}
+        run: |
+          set -uo pipefail
+          git fetch origin "$BASE_REF" --depth=1
+          changed() { git diff --name-only --diff-filter=d "origin/$BASE_REF...HEAD" -- "$@" || true; }
+          mapfile -t shell_specs < <(printf '%s\n' "$SHELL_PATHS" | sed '/^[[:space:]]*$/d')
+          SH=$(changed "${shell_specs[@]}")
+          PY=""
+          if [ -n "$RUFF_VERSION" ]; then PY=$(changed '*.py'); fi
+          fence=$(printf '\140\140\140')  # a markdown code fence
+          # Test each linter's own output, never the assembled markdown.
+          report() {  # title, files, output
+            if [ -z "$3" ]; then
+              echo "$1 found no issues in:"
+              printf '%s\n' "$2" | sed 's/^/- /'
+            else
+              printf '## %s\n%s\n%s\n%s\n' "$1" "$fence" "$3" "$fence"
+            fi
+            echo
+          }
+          {
+            if [ -z "$SH$PY" ] && [ "$ACTIONLINT" != true ]; then
+              echo "No files this review lints changed in this PR."
+            fi
+            if [ -n "$SH" ]; then
+              report shellcheck "$SH" "$(printf '%s\n' "$SH" | xargs -d '\n' shellcheck 2>&1)"
+            fi
+            if [ -n "$PY" ]; then
+              OUT=$(printf '%s\n' "$PY" | xargs -d '\n' pipx run "ruff==$RUFF_VERSION" check --output-format concise --no-cache 2>&1) && OUT=""
+              report "ruff $RUFF_VERSION" "$PY" "$OUT"
+            fi
+            if [ "$ACTIONLINT" = true ]; then
+              report actionlint ".github/workflows/" "$("$RUNNER_TEMP/actionlint" -no-color 2>&1)"
+            fi
+          } > review.md
+
+      - name: Post as a GitHub review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr review "$PR_NUMBER" --comment --body-file review.md
