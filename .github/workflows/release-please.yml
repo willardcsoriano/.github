@@ -1,0 +1,50 @@
+name: Release (reusable)
+
+# Releases a repo from its Conventional Commit titles, with release-please.
+# Every push to the default branch updates one open release PR: the next
+# version (fix -> patch, feat -> minor, ! -> major), the changelog, and any
+# version strings the repo marks. Merging that PR tags the release and
+# publishes it on GitHub.
+#
+# The calling repo holds release-please-config.json and
+# .release-please-manifest.json, and calls this with:
+#
+#   on:
+#     push:
+#       branches: [master]
+#   permissions:
+#     contents: write
+#     pull-requests: write
+#     issues: write
+#   jobs:
+#     release:
+#       uses: willardcsoriano/.github/.github/workflows/release-please.yml@v1
+#
+# It needs "Allow GitHub Actions to create and approve pull requests" on the
+# calling repo, because release-please opens the PR with GitHub's own token.
+# That token's PRs start no workflows, so a release PR's checks never run by
+# themselves. Close and reopen it (as yourself) to run them; see README.md.
+
+on:
+  workflow_call:
+    outputs:
+      release_created:
+        description: "'true' when this run published a release"
+        value: ${{ jobs.release-please.outputs.release_created }}
+      tag_name:
+        description: The tag of the release this run published, if any
+        value: ${{ jobs.release-please.outputs.tag_name }}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
